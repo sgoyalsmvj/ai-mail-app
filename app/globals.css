@@ -24,3 +24,54 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Email HTML Content Styles */
+.email-html-content {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.email-html-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.email-html-content table {
+  max-width: 100%;
+  border-collapse: collapse;
+}
+
+.email-html-content table td {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.email-html-content a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.email-html-content a:hover {
+  color: #2563eb;
+}
+
+/* Hide URLs that appear as visible text in links */
+.email-html-content a[href]::after {
+  content: none !important;
+}
+
+/* Ensure button/link text is preserved but raw URLs are hidden */
+.email-html-content a > span {
+  display: inline;
+}
+
+@media (prefers-color-scheme: dark) {
+  .email-html-content a {
+    color: #60a5fa;
+  }
+
+  .email-html-content a:hover {
+    color: #93c5fd;
+  }
+}

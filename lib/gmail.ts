@@ -63,7 +63,15 @@ const fetchInboxEmails = async (accessToken: string): Promise<Email[]> => {
     );
 
     if (!listResponse.ok) {
-      throw new Error("Failed to fetch email list");
+      const errorData = await listResponse.json().catch(() => ({}));
+      console.error("Gmail API error:", {
+        status: listResponse.status,
+        statusText: listResponse.statusText,
+        error: errorData,
+      });
+      throw new Error(
+        `Failed to fetch email list: ${listResponse.status} ${listResponse.statusText} - ${JSON.stringify(errorData)}`,
+      );
     }
 
     const listData = await listResponse.json();
