@@ -6,6 +6,7 @@ import { useMailStore } from "@/store/mailStore";
 import EmailList from "@/components/mail/EmailList";
 import EmailDetail from "@/components/mail/EmailDetail";
 import ComposeForm from "@/components/mail/ComposeForm";
+import AssistantPanel from "@/components/assistant/AssistantPanel";
 import { Inbox, RefreshCw, LogOut, PenSquare } from "lucide-react";
 
 export default function Home() {
@@ -109,100 +110,116 @@ export default function Home() {
 
   // Authenticated - show inbox
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900">
-      {/* Header */}
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Inbox className="h-6 w-6 text-zinc-900 dark:text-zinc-100" />
-              <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-                AI Mail App
-              </h1>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <button
-                onClick={fetchEmails}
-                disabled={isLoading}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                title="Refresh emails"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-                />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
-
-              <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-
-              <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                <span className="hidden sm:inline">{session.user?.email}</span>
+    <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-900">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black">
+          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Inbox className="h-6 w-6 text-zinc-900 dark:text-zinc-100" />
+                <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                  AI Mail App
+                </h1>
               </div>
 
-              <button
-                onClick={() => signOut()}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                title="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={fetchEmails}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  title="Refresh emails"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+                  />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+
+                <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+
+                <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                  <span className="hidden sm:inline">
+                    {session.user?.email}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => signOut()}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  title="Sign out"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
-            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-            {error.includes("Session expired") && (
-              <button
-                onClick={() => signIn("google")}
-                className="mt-2 text-sm font-medium text-red-600 underline dark:text-red-400"
-              >
-                Sign in again
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Conditional View Rendering */}
-        {currentView === "inbox" && (
-          <>
-            {/* Inbox Header */}
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                  Inbox
-                </h2>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {emails.length} {emails.length === 1 ? "email" : "emails"}
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  {error}
                 </p>
+                {error.includes("Session expired") && (
+                  <button
+                    onClick={() => signIn("google")}
+                    className="mt-2 text-sm font-medium text-red-600 underline dark:text-red-400"
+                  >
+                    Sign in again
+                  </button>
+                )}
               </div>
+            )}
 
-              {/* Compose Button */}
-              <button
-                onClick={() => setCurrentView("compose")}
-                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-              >
-                <PenSquare className="h-4 w-4" />
-                Compose
-              </button>
-            </div>
+            {/* Conditional View Rendering */}
+            {currentView === "inbox" && (
+              <>
+                {/* Inbox Header */}
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                      Inbox
+                    </h2>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      {emails.length} {emails.length === 1 ? "email" : "emails"}
+                    </p>
+                  </div>
 
-            {/* Email List */}
-            <EmailList />
-          </>
-        )}
+                  {/* Compose Button */}
+                  <button
+                    onClick={() => setCurrentView("compose")}
+                    className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  >
+                    <PenSquare className="h-4 w-4" />
+                    Compose
+                  </button>
+                </div>
 
-        {currentView === "detail" && <EmailDetail />}
+                {/* Email List */}
+                <EmailList />
+              </>
+            )}
 
-        {currentView === "compose" && <ComposeForm />}
-      </main>
+            {currentView === "detail" && <EmailDetail />}
+
+            {currentView === "compose" && <ComposeForm />}
+          </div>
+        </main>
+      </div>
+
+      {/* Assistant Panel Sidebar */}
+      <aside className="hidden lg:block w-96 border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="h-screen sticky top-0">
+          <AssistantPanel />
+        </div>
+      </aside>
     </div>
   );
 }

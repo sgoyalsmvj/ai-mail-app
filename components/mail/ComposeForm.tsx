@@ -2,7 +2,7 @@
 
 import { useMailStore } from "@/store/mailStore";
 import { ArrowLeft, Send, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function ComposeForm() {
   const { composeForm, updateComposeForm, resetComposeForm, setCurrentView } =
@@ -10,6 +10,50 @@ export default function ComposeForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Refs for animation
+  const toRef = useRef<HTMLInputElement>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  // Previous values to detect AI fills
+  const prevTo = useRef(composeForm.to);
+  const prevSubject = useRef(composeForm.subject);
+  const prevBody = useRef(composeForm.body);
+
+  // Detect AI fills and animate
+  useEffect(() => {
+    if (composeForm.to !== prevTo.current && composeForm.to) {
+      toRef.current?.classList.add("ai-field-highlight");
+      setTimeout(
+        () => toRef.current?.classList.remove("ai-field-highlight"),
+        1000,
+      );
+      prevTo.current = composeForm.to;
+    }
+  }, [composeForm.to]);
+
+  useEffect(() => {
+    if (composeForm.subject !== prevSubject.current && composeForm.subject) {
+      subjectRef.current?.classList.add("ai-field-highlight");
+      setTimeout(
+        () => subjectRef.current?.classList.remove("ai-field-highlight"),
+        1000,
+      );
+      prevSubject.current = composeForm.subject;
+    }
+  }, [composeForm.subject]);
+
+  useEffect(() => {
+    if (composeForm.body !== prevBody.current && composeForm.body) {
+      bodyRef.current?.classList.add("ai-field-highlight");
+      setTimeout(
+        () => bodyRef.current?.classList.remove("ai-field-highlight"),
+        1000,
+      );
+      prevBody.current = composeForm.body;
+    }
+  }, [composeForm.body]);
 
   const handleCancel = () => {
     resetComposeForm();
@@ -147,6 +191,7 @@ export default function ComposeForm() {
             To
           </label>
           <input
+            ref={toRef}
             id="to"
             type="email"
             value={composeForm.to}
@@ -166,6 +211,7 @@ export default function ComposeForm() {
             Subject
           </label>
           <input
+            ref={subjectRef}
             id="subject"
             type="text"
             value={composeForm.subject}
@@ -185,6 +231,7 @@ export default function ComposeForm() {
             Message
           </label>
           <textarea
+            ref={bodyRef}
             id="body"
             value={composeForm.body}
             onChange={(e) => updateComposeForm("body", e.target.value)}
