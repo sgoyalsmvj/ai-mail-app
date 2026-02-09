@@ -29,17 +29,27 @@ export default function AssistantPanel() {
   }, [messages]);
 
   const buildContext = () => {
+    const { currentView, currentEmail, filteredEmails } =
+      useMailStore.getState();
+
+    const recentEmails = filteredEmails.slice(0, 5).map((email, index) => ({
+      id: email.id,
+      index: index,
+      from: email.from,
+      subject: email.subject,
+      date: email.date,
+    }));
+
     return {
       currentView,
-      currentEmailId: currentEmail?.id,
       currentEmail: currentEmail
         ? {
             id: currentEmail.id,
             from: currentEmail.from,
             subject: currentEmail.subject,
-            body: currentEmail.body,
           }
         : undefined,
+      recentEmails,
     };
   };
 

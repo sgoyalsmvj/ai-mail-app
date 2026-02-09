@@ -17,6 +17,7 @@ interface MailStoreState {
   composeForm: ComposeForm;
   isLoading: boolean;
   filters: Partial<EmailFilters>;
+  searchQuery: string;
 
   // Actions
   setEmails: (emails: Email[]) => void;
@@ -25,6 +26,7 @@ interface MailStoreState {
   updateComposeForm: (field: keyof ComposeForm, value: string) => void;
   resetComposeForm: () => void;
   setIsLoading: (isLoading: boolean) => void;
+  setSearchQuery: (query: string) => void;
 
   // Filter Actions
   setFilters: (filters: Partial<EmailFilters>) => void;
@@ -51,7 +53,11 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
   composeForm: initialComposeForm,
   isLoading: false,
   filters: {},
-
+  searchQuery: "",
+  setSearchQuery: (query: string) => {
+    set({ searchQuery: query });
+    get().applyFilters();
+  },
   setEmails: (emails: Email[]) => {
     set({ emails, filteredEmails: emails });
     get().applyFilters(); // Apply any existing filters
@@ -71,9 +77,19 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
   },
 
   applyFilters: () => {
-    const { emails, filters } = get();
+    const { emails, filters, searchQuery } = get();
 
     let filtered = [...emails];
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (email) =>
+          email.subject.toLowerCase().includes(query) ||
+          email.from.toLowerCase().includes(query) ||
+          email.snippet.toLowerCase().includes(query),
+      );
+    }
 
     // Filter by sender
     if (filters.sender) {
@@ -118,6 +134,7 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
     const { emails } = get();
     set({
       filters: {},
+      searchQuery: "",
       filteredEmails: emails,
     });
   },
@@ -239,7 +256,7 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
         break;
 
       case "FILTER_EMAILS":
-        toast.success("Filtering emails...");
+        toast.info("Filtering emails...");
         get().setFilters({
           sender: action.sender,
           dateRange: action.dateRange,
@@ -248,11 +265,37 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
         break;
 
       case "OPEN_EMAIL":
-        // Find email by ID and open it
-        const email = state.emails.find((e) => e.id === action.emailId);
-        if (email) {
+        // Find email by ID or reference
+        let emailToOpen: Email | undefined;
+
+        // Handle special references
+        if (action.emailId === "latest") {
+          // Find most recent email
+          const sorted = [...state.filteredEmails].sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+          );
+          emailToOpen = sorted[0];
+          toast.success("Opening latest email...");
+        } else if (action.emailId.startsWith("from:")) {
+          // Find by sender
+          const sender = action.emailId.substring(5).toLowerCase();
+          emailToOpen = state.filteredEmails.find((e) =>
+            e.from.toLowerCase().includes(sender),
+          );
+          toast.success(`Opening email from ${sender}...`);
+        } else if (action.emailId.startsWith("index:")) {
+          // Find by index (e.g., "index:2" for third email)
+          const index = parseInt(action.emailId.substring(6));
+          emailToOpen = state.filteredEmails[index];
+          toast.success(`Opening email #${index + 1}...`);
+        } else {
+          // Find by actual ID
+          emailToOpen = state.emails.find((e) => e.id === action.emailId);
           toast.success("Opening email...");
-          set({ currentEmail: email, currentView: "detail" });
+        }
+
+        if (emailToOpen) {
+          set({ currentEmail: emailToOpen, currentView: "detail" });
         } else {
           toast.error("Email not found");
           console.error("Email not found:", action.emailId);
@@ -287,6 +330,11 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
           toast.error("No email to reply to");
           console.error("No email to reply to");
         }
+        break;
+
+      case "SEARCH_EMAILS":
+        toast.info(`Searching for: "${action.query}"`);
+        get().setSearchQuery(action.query);
         break;
 
       default:

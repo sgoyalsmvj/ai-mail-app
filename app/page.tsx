@@ -9,6 +9,7 @@ import ComposeForm from "@/components/mail/ComposeForm";
 import AssistantPanel from "@/components/assistant/AssistantPanel";
 import { Inbox, RefreshCw, LogOut, PenSquare } from "lucide-react";
 import FilterBar from "@/components/mail/FilterBar";
+import SearchBar from "@/components/mail/SearchBar";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -179,16 +180,13 @@ export default function Home() {
               </div>
             )}
 
-            {/* Conditional View Rendering */}
             {currentView === "inbox" && (
-              <>
+              <div className="space-y-4">
+                <SearchBar />
                 <FilterBar />
-
-                {/* Email List */}
                 <EmailList />
-              </>
+              </div>
             )}
-
             {currentView === "detail" && <EmailDetail />}
 
             {currentView === "compose" && <ComposeForm />}

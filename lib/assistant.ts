@@ -9,9 +9,10 @@ Available actions:
 - FILL_COMPOSE: Fill compose form fields (to, subject, body)
 - SEND_EMAIL: Send the current email (only use if compose form is already filled OR after FILL_COMPOSE)
 - FILTER_EMAILS: Filter inbox (sender, dateRange, unread)
-- OPEN_EMAIL: Open specific email by ID
+- OPEN_EMAIL: Open specific email by ID or reference (supports "latest", "from:Name", or "index:N")
 - NAVIGATE: Change view (inbox, sent, compose)
 - REPLY_TO_CURRENT: Reply to currently open email
+- SEARCH_EMAILS: Search emails by query
 
 IMPORTANT RULES:
 1. When user wants to send an email with specific content, use: OPEN_COMPOSE → FILL_COMPOSE
@@ -21,6 +22,12 @@ IMPORTANT RULES:
 5. ALWAYS validate email addresses - they MUST include "@" and a domain (e.g., user@example.com)
 6. If user provides incomplete email (like just "john" without domain), return empty actions array and include a helpful message asking for complete email
 7. REPLY_TO_CURRENT opens compose with pre-filled recipient and quoted message. If user wants to add custom message content (e.g., "reply and say X"), follow REPLY_TO_CURRENT → FILL_COMPOSE → SEND_EMAIL (since replying with a message implies sending)
+
+OPENING EMAILS BY REFERENCE:
+When user wants to open an email by reference:
+- "latest email" or "most recent" → Use emailId: "latest"
+- "email from [name]" → Use emailId: "from:Name"
+- "third email" or "email number 3" → Use emailId: "index:2" (zero-indexed)
 
 Context will be provided with each request.
 
@@ -70,7 +77,43 @@ Response: {
   "actions": [
     { "type": "FILTER_EMAILS", "dateRange": "last_week" }
   ]
-}`;
+}
+
+User: "Find emails about project update"
+Response: {
+  "actions": [
+    { "type": "SEARCH_EMAILS", "query": "project update" }
+  ]
+}
+
+User: "Search for meeting"
+Response: {
+  "actions": [
+    { "type": "SEARCH_EMAILS", "query": "meeting" }
+  ]
+}
+
+User: "Open the latest email"
+Response: {
+  "actions": [
+    { "type": "OPEN_EMAIL", "emailId": "latest" }
+  ]
+}
+
+User: "Open email from David"
+Response: {
+  "actions": [
+    { "type": "OPEN_EMAIL", "emailId": "from:David" }
+  ]
+}
+
+User: "Show me the third email"
+Response: {
+  "actions": [
+    { "type": "OPEN_EMAIL", "emailId": "index:2" }
+  ]
+}
+`;
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -161,11 +204,20 @@ function buildContextString(context: AppContext): string {
     contextString += `  ID: ${context.currentEmail.id}\n`;
     contextString += `  From: ${context.currentEmail.from}\n`;
     contextString += `  Subject: ${context.currentEmail.subject}\n`;
-    contextString += `  Date: ${context.currentEmail.date}\n`;
+    if (context.currentEmail.date) {
+      contextString += `  Date: ${context.currentEmail.date}\n`;
+    }
   }
 
   if (context.currentEmailId) {
     contextString += `- Current email ID: ${context.currentEmailId}\n`;
+  }
+
+  if (context.recentEmails && context.recentEmails.length > 0) {
+    contextString += `- Recent emails in inbox:\n`;
+    context.recentEmails.forEach((email, i) => {
+      contextString += `  ${i + 1}. From ${email.from}: "${email.subject}" (ID: ${email.id})\n`;
+    });
   }
 
   return contextString;
