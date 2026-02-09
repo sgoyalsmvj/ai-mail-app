@@ -8,6 +8,7 @@ import EmailDetail from "@/components/mail/EmailDetail";
 import ComposeForm from "@/components/mail/ComposeForm";
 import AssistantPanel from "@/components/assistant/AssistantPanel";
 import { Inbox, RefreshCw, LogOut, PenSquare } from "lucide-react";
+import FilterBar from "@/components/mail/FilterBar";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -181,26 +182,7 @@ export default function Home() {
             {/* Conditional View Rendering */}
             {currentView === "inbox" && (
               <>
-                {/* Inbox Header */}
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                      Inbox
-                    </h2>
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                      {emails.length} {emails.length === 1 ? "email" : "emails"}
-                    </p>
-                  </div>
-
-                  {/* Compose Button */}
-                  <button
-                    onClick={() => setCurrentView("compose")}
-                    className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                  >
-                    <PenSquare className="h-4 w-4" />
-                    Compose
-                  </button>
-                </div>
+                <FilterBar />
 
                 {/* Email List */}
                 <EmailList />

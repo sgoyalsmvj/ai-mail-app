@@ -1,14 +1,22 @@
 import { create } from "zustand";
-import { Email, ComposeForm, View, AssistantAction } from "../lib/types";
+import {
+  Email,
+  ComposeForm,
+  View,
+  AssistantAction,
+  EmailFilters,
+} from "../lib/types";
 import { toast } from "sonner";
 
 interface MailStoreState {
   // State
   emails: Email[];
+  filteredEmails: Email[];
   currentView: View;
   currentEmail: Email | null;
   composeForm: ComposeForm;
   isLoading: boolean;
+  filters: Partial<EmailFilters>;
 
   // Actions
   setEmails: (emails: Email[]) => void;
@@ -17,6 +25,11 @@ interface MailStoreState {
   updateComposeForm: (field: keyof ComposeForm, value: string) => void;
   resetComposeForm: () => void;
   setIsLoading: (isLoading: boolean) => void;
+
+  // Filter Actions
+  setFilters: (filters: Partial<EmailFilters>) => void;
+  applyFilters: () => void;
+  clearFilters: () => void;
 
   // AI Assistant Actions
   executeAction: (action: AssistantAction) => Promise<void>;
@@ -29,20 +42,85 @@ const initialComposeForm: ComposeForm = {
   body: "",
 };
 
-export const useMailStore = create<MailStoreState>((set) => ({
+export const useMailStore = create<MailStoreState>((set, get) => ({
   // Initial state
   emails: [],
+  filteredEmails: [],
   currentView: "inbox",
   currentEmail: null,
   composeForm: initialComposeForm,
   isLoading: false,
+  filters: {},
 
-  // Actions
-  setEmails: (emails) => set({ emails }),
+  setEmails: (emails: Email[]) => {
+    set({ emails, filteredEmails: emails });
+    get().applyFilters(); // Apply any existing filters
+  },
 
   setCurrentView: (view) => set({ currentView: view }),
 
   setCurrentEmail: (email) => set({ currentEmail: email }),
+
+  // Filter Actions
+  setFilters: (newFilters: Partial<EmailFilters>) => {
+    set((state) => ({
+      filters: { ...state.filters, ...newFilters },
+    }));
+    // Auto-apply filters after setting them
+    get().applyFilters();
+  },
+
+  applyFilters: () => {
+    const { emails, filters } = get();
+
+    let filtered = [...emails];
+
+    // Filter by sender
+    if (filters.sender) {
+      const searchTerm = filters.sender.toLowerCase();
+      filtered = filtered.filter((email) =>
+        email.from.toLowerCase().includes(searchTerm),
+      );
+    }
+
+    // Filter by date range
+    if (filters.dateRange) {
+      const now = new Date();
+      let cutoffDate = new Date();
+
+      switch (filters.dateRange) {
+        case "today":
+          cutoffDate.setHours(0, 0, 0, 0);
+          break;
+        case "last_week":
+          cutoffDate.setDate(now.getDate() - 7);
+          break;
+        case "last_month":
+          cutoffDate.setMonth(now.getMonth() - 1);
+          break;
+      }
+
+      filtered = filtered.filter((email) => {
+        const emailDate = new Date(email.date);
+        return emailDate >= cutoffDate;
+      });
+    }
+
+    // Filter by unread status
+    if (filters.unread) {
+      filtered = filtered.filter((email) => !email.isRead);
+    }
+
+    set({ filteredEmails: filtered });
+  },
+
+  clearFilters: () => {
+    const { emails } = get();
+    set({
+      filters: {},
+      filteredEmails: emails,
+    });
+  },
 
   updateComposeForm: (field, value) =>
     set((state) => ({
@@ -58,7 +136,7 @@ export const useMailStore = create<MailStoreState>((set) => ({
 
   // AI Assistant Action Dispatcher
   executeAction: async (action) => {
-    const state = useMailStore.getState();
+    let state = useMailStore.getState();
 
     switch (action.type) {
       case "OPEN_COMPOSE":
@@ -161,15 +239,12 @@ export const useMailStore = create<MailStoreState>((set) => ({
         break;
 
       case "FILTER_EMAILS":
-        toast.info("Filtering emails...");
-        // Filter functionality (Day 3 feature)
-        // For now, just log the filter criteria
-        console.log("Filter emails:", {
+        toast.success("Filtering emails...");
+        get().setFilters({
           sender: action.sender,
           dateRange: action.dateRange,
           unread: action.unread,
         });
-        // TODO: Implement filtering logic when filter state is added
         break;
 
       case "OPEN_EMAIL":

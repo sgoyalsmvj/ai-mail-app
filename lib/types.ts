@@ -37,3 +37,9 @@ export interface AssistantResponse {
   actions: AssistantAction[];
   message?: string;
 }
+
+export interface EmailFilters {
+  sender?: string;
+  dateRange?: string;
+  unread?: boolean;
+}
