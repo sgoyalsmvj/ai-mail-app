@@ -83,17 +83,17 @@ export const useMailStore = create<MailStoreState>((set) => ({
 
         set((state) => {
           const updates: Partial<ComposeForm> = {};
-          
+
           if (action.to) updates.to = action.to;
           if (action.subject) updates.subject = action.subject;
-          
+
           // Smart body handling: if there's already a body (e.g., from REPLY_TO_CURRENT)
           // and the new body doesn't contain the "---" separator, prepend new message
           if (action.body !== undefined) {
             const existingBody = state.composeForm.body;
             const hasQuotedText = existingBody.includes("\n\n---\n");
             const newBodyHasQuote = action.body.includes("\n\n---\n");
-            
+
             if (hasQuotedText && !newBodyHasQuote && action.body.trim()) {
               // Prepend new message to existing quoted text
               updates.body = action.body.trim() + "\n" + existingBody;
@@ -102,7 +102,7 @@ export const useMailStore = create<MailStoreState>((set) => ({
               updates.body = action.body;
             }
           }
-          
+
           return {
             composeForm: {
               ...state.composeForm,
@@ -194,11 +194,12 @@ export const useMailStore = create<MailStoreState>((set) => ({
         if (state.currentEmail) {
           toast.success("Preparing reply...");
           const { from, subject, body } = state.currentEmail;
-          
+
           // Extract email address from "Name <email@domain.com>" format
-          const emailMatch = from.match(/<(.+?)>/) || from.match(/([^\s@]+@[^\s@]+\.[^\s@]+)/);
+          const emailMatch =
+            from.match(/<(.+?)>/) || from.match(/([^\s@]+@[^\s@]+\.[^\s@]+)/);
           const toEmail = emailMatch ? emailMatch[1] : from;
-          
+
           set({
             composeForm: {
               to: toEmail,
