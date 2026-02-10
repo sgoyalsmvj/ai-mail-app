@@ -2,11 +2,19 @@
 
 import { useMailStore } from "@/store/mailStore";
 import { Search, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function SearchBar() {
   const { searchQuery, setSearchQuery } = useMailStore();
   const [input, setInput] = useState(searchQuery);
+
+  // Sync local input with store searchQuery only when it's cleared externally
+  useEffect(() => {
+    // Only update local input if searchQuery was cleared (e.g., via Clear Filters)
+    if (searchQuery === "" && input !== "") {
+      setInput("");
+    }
+  }, [searchQuery]);
 
   const handleSearch = () => {
     setSearchQuery(input);

@@ -1,11 +1,11 @@
 "use client";
 
 import { useMailStore } from "@/store/mailStore";
-import { X, Filter, Calendar } from "lucide-react";
+import { X, Filter, Calendar, Search } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export default function FilterBar() {
-  const { filters, setFilters, clearFilters } = useMailStore();
+  const { filters, setFilters, clearFilters, searchQuery } = useMailStore();
   const [senderInput, setSenderInput] = useState(filters.sender || "");
   const [showCustomDate, setShowCustomDate] = useState(
     Boolean(filters.dateFrom || filters.dateTo),
@@ -17,6 +17,11 @@ export default function FilterBar() {
       setShowCustomDate(true);
     }
   }, [filters.dateFrom, filters.dateTo]);
+
+  // Sync sender input when filters are cleared
+  useEffect(() => {
+    setSenderInput(filters.sender || "");
+  }, [filters.sender]);
 
   const handleSenderChange = (value: string) => {
     setSenderInput(value);
@@ -41,7 +46,8 @@ export default function FilterBar() {
     filters.dateFrom ||
     filters.dateTo ||
     filters.sender ||
-    filters.unread;
+    filters.unread ||
+    searchQuery;
 
   return (
     <div className="mb-4 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
@@ -123,6 +129,14 @@ export default function FilterBar() {
           <span>Unread only</span>
         </label>
 
+        {/* Active Search Query Badge */}
+        {searchQuery && (
+          <div className="flex items-center gap-1.5 rounded-md bg-blue-100 px-3 py-1.5 text-sm text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+            <Search className="h-3.5 w-3.5" />
+            <span className="max-w-[200px] truncate">{searchQuery}</span>
+          </div>
+        )}
+
         {/* Clear Filters Button */}
         {hasActiveFilters && (
           <button
@@ -130,7 +144,7 @@ export default function FilterBar() {
             className="ml-auto flex items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           >
             <X className="h-4 w-4" />
-            Clear
+            Clear Filters
           </button>
         )}
       </div>

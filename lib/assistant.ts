@@ -9,11 +9,11 @@ Available actions:
 - OPEN_COMPOSE: Open compose form
 - FILL_COMPOSE: Fill compose form fields (to, subject, body)
 - SEND_EMAIL: Send the current email (requires confirmation by default unless user says "without confirmation")
-- FILTER_EMAILS: Filter inbox (sender, dateRange, dateFrom, dateTo, unread)
+- FILTER_EMAILS: Filter inbox (sender, dateRange, dateFrom, dateTo, unread) - Use for filtering by SENDER (from:)
 - OPEN_EMAIL: Open specific email by ID or reference (supports "latest", "from:Name", or "index:N")
 - NAVIGATE: Change view (inbox, sent, compose)
 - REPLY_TO_CURRENT: Reply to currently open email
-- SEARCH_EMAILS: Search emails by query
+- SEARCH_EMAILS: Search emails by content/subject query (NOT for sender filtering)
 - FORWARD_CURRENT: Forward the currently open email
 
 IMPORTANT RULES:
@@ -43,6 +43,15 @@ DATE FILTERING:
   * "since February 5th" → dateFrom: "2026-02-05"
   * "before January 15th" → dateTo: "2026-01-15"
 - Today's date for reference: ${new Date().toISOString().split("T")[0]}
+
+SENDER FILTERING VS SEARCH:
+CRITICAL: When user wants to find emails FROM a person, use FILTER_EMAILS with "sender" parameter, NOT SEARCH_EMAILS
+- ✅ "find emails from John" → Use FILTER_EMAILS with sender: "John"
+- ✅ "show me emails from saurabh goyal" → Use FILTER_EMAILS with sender: "saurabh goyal"
+- ✅ "emails from john@example.com" → Use FILTER_EMAILS with sender: "john@example.com"
+- ✅ "find email from David" → Use FILTER_EMAILS with sender: "David"
+- ❌ DO NOT use SEARCH_EMAILS for finding emails by sender
+- Use SEARCH_EMAILS only for content/subject searches: "find emails about project", "search for meeting notes"
 
 CONFIRMATION BEHAVIOR:
 - "Send this email" → Shows confirmation modal
@@ -181,18 +190,44 @@ Response: {
   "message": "Showing emails from January 1 to January 15"
 }
 
+User: "Find emails from saurabh goyal"
+Response: {
+  "actions": [
+    { "type": "FILTER_EMAILS", "sender": "saurabh goyal" }
+  ],
+  "message": "Showing emails from saurabh goyal"
+}
+
+User: "Show me emails from John"
+Response: {
+  "actions": [
+    { "type": "FILTER_EMAILS", "sender": "John" }
+  ],
+  "message": "Filtering emails from John"
+}
+
+User: "Find email from david@example.com"
+Response: {
+  "actions": [
+    { "type": "FILTER_EMAILS", "sender": "david@example.com" }
+  ],
+  "message": "Showing emails from david@example.com"
+}
+
 User: "Find emails about project update"
 Response: {
   "actions": [
     { "type": "SEARCH_EMAILS", "query": "project update" }
-  ]
+  ],
+  "message": "Searching for 'project update'"
 }
 
 User: "Search for meeting"
 Response: {
   "actions": [
     { "type": "SEARCH_EMAILS", "query": "meeting" }
-  ]
+  ],
+  "message": "Searching for 'meeting'"
 }
 
 User: "Show sent emails"
