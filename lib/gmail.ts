@@ -55,20 +55,70 @@ const extractBody = (payload: any): string => {
   return "";
 };
 
+interface FetchEmailOptions {
+  dateFrom?: string;
+  dateTo?: string;
+  sender?: string;
+  maxResults?: number;
+}
+
+// Helper to build Gmail API query string for filtering
+const buildGmailQuery = (options: FetchEmailOptions): string => {
+  const queryParts: string[] = [];
+
+  // Add sender filter using Gmail search syntax
+  if (options.sender) {
+    // Gmail's from: operator supports email addresses or names
+    queryParts.push(`from:${options.sender}`);
+  }
+
+  // Add date filters using Gmail search syntax
+  // Note: Gmail's after: and before: are INCLUSIVE when comparing dates
+  if (options.dateFrom) {
+    // Convert YYYY-MM-DD to YYYY/MM/DD format for Gmail
+    const formattedDate = options.dateFrom.replace(/-/g, "/");
+    queryParts.push(`after:${formattedDate}`);
+  }
+
+  if (options.dateTo) {
+    // Convert YYYY-MM-DD to YYYY/MM/DD format for Gmail
+    // Add one day to make it inclusive (Gmail's before: is exclusive)
+    const date = new Date(options.dateTo);
+    date.setDate(date.getDate() + 1);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const formattedDate = `${year}/${month}/${day}`;
+    queryParts.push(`before:${formattedDate}`);
+  }
+
+  return queryParts.length > 0 ? queryParts.join(" ") : "";
+};
+
 // Fetch inbox emails with full details
-const fetchInboxEmails = async (accessToken: string): Promise<Email[]> => {
+const fetchInboxEmails = async (
+  accessToken: string,
+  options: FetchEmailOptions = {},
+): Promise<Email[]> => {
   try {
     return await retryWithBackoff(
       async () => {
+        // Build query string for date filtering
+        const query = buildGmailQuery(options);
+        const maxResults = options.maxResults || 50; // Increased from 10 to 50 for better coverage
+
+        // Build URL with query parameters
+        let url = `https://www.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=${maxResults}`;
+        if (query) {
+          url += `&q=${encodeURIComponent(query)}`;
+        }
+
         // Step 1: Fetch list of message IDs
-        const listResponse = await fetch(
-          "https://www.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=10",
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
+        const listResponse = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
           },
-        ).catch((error) => {
+        }).catch((error) => {
           throw new GmailNetworkError(`Network error: ${error.message}`);
         });
 

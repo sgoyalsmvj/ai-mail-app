@@ -34,6 +34,7 @@ interface MailStoreState {
   setRequiresConfirmation: (requires: boolean) => void;
   setShowConfirmationModal: (show: boolean) => void;
   confirmAndSendEmail: () => Promise<void>;
+  fetchEmails: (accessToken: string) => Promise<void>;
 
   // Filter Actions
   setFilters: (filters: Partial<EmailFilters>) => void;
@@ -41,8 +42,14 @@ interface MailStoreState {
   clearFilters: () => void;
 
   // AI Assistant Actions
-  executeAction: (action: AssistantAction) => Promise<void>;
-  executeActions: (actions: AssistantAction[]) => Promise<void>;
+  executeAction: (
+    action: AssistantAction,
+    accessToken?: string,
+  ) => Promise<void>;
+  executeActions: (
+    actions: AssistantAction[],
+    accessToken?: string,
+  ) => Promise<void>;
 }
 
 const initialComposeForm: ComposeForm = {
@@ -120,22 +127,46 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
 
   // Filter Actions
   setFilters: (newFilters: Partial<EmailFilters>) => {
-    set((state) => ({
-      filters: { ...state.filters, ...newFilters },
-    }));
+    set((state) => {
+      const updatedFilters = { ...state.filters };
+
+      // Handle each filter property - remove if null/undefined
+      Object.keys(newFilters).forEach((key) => {
+        const filterKey = key as keyof EmailFilters;
+        const value = newFilters[filterKey];
+
+        if (value === null || value === undefined) {
+          // Remove the filter property
+          delete updatedFilters[filterKey];
+        } else {
+          // Set the filter property
+          updatedFilters[filterKey] = value as any;
+        }
+      });
+
+      return { filters: updatedFilters };
+    });
     // Auto-apply filters after setting them
     get().applyFilters();
   },
 
   /**
    * Apply current filters and search query to emails
-   * Filters are applied sequentially: search → sender → date → unread
+   * Filters are applied sequentially: search → date → unread
+   * Note: Sender and date filters are now handled server-side in fetchEmails
    */
   applyFilters: () => {
     const { emails, filters, searchQuery } = get();
 
+    console.log("Applying filters:", {
+      totalEmails: emails.length,
+      filters,
+      searchQuery,
+    });
+
     let filtered = [...emails];
 
+    // Client-side search query filtering
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -146,15 +177,10 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
       );
     }
 
-    // Filter by sender
-    if (filters.sender) {
-      const searchTerm = filters.sender.toLowerCase();
-      filtered = filtered.filter((email) =>
-        email.from.toLowerCase().includes(searchTerm),
-      );
-    }
+    // Note: Sender filtering is now handled server-side in the Gmail API query
+    // Date filtering is also handled server-side for better performance
 
-    // Filter by date range
+    // Filter by date range (preset ranges)
     if (filters.dateRange) {
       const now = new Date();
       let cutoffDate = new Date();
@@ -167,7 +193,7 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
           cutoffDate.setDate(now.getDate() - 7);
           break;
         case "last_month":
-          cutoffDate.setMonth(now.getMonth() - 1);
+          cutoffDate.setDate(now.getDate() - 30);
           break;
       }
 
@@ -177,10 +203,56 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
       });
     }
 
+    // Filter by custom date range (dateFrom/dateTo)
+    if (filters.dateFrom || filters.dateTo) {
+      filtered = filtered.filter((email) => {
+        try {
+          const emailDate = new Date(email.date);
+
+          // Get just the date part (YYYY-MM-DD) for comparison
+          const emailYear = emailDate.getFullYear();
+          const emailMonth = emailDate.getMonth();
+          const emailDay = emailDate.getDate();
+
+          if (filters.dateFrom) {
+            const [fromYear, fromMonth, fromDay] = filters.dateFrom
+              .split("-")
+              .map(Number);
+            const fromDateObj = new Date(fromYear, fromMonth - 1, fromDay);
+            const emailDateObj = new Date(emailYear, emailMonth, emailDay);
+
+            if (emailDateObj < fromDateObj) return false;
+          }
+
+          if (filters.dateTo) {
+            const [toYear, toMonth, toDay] = filters.dateTo
+              .split("-")
+              .map(Number);
+            const toDateObj = new Date(toYear, toMonth - 1, toDay);
+            const emailDateObj = new Date(emailYear, emailMonth, emailDay);
+
+            if (emailDateObj > toDateObj) return false;
+          }
+
+          return true;
+        } catch (error) {
+          console.error("Error filtering email by date:", email.date, error);
+          return true; // Include email if date parsing fails
+        }
+      });
+    }
+
     // Filter by unread status
     if (filters.unread) {
       filtered = filtered.filter((email) => !email.isRead);
     }
+
+    console.log("After filtering:", {
+      resultCount: filtered.length,
+      sampleDates: filtered
+        .slice(0, 3)
+        .map((e) => ({ id: e.id.substring(0, 8), date: e.date })),
+    });
 
     set({ filteredEmails: filtered });
   },
@@ -192,6 +264,41 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
       searchQuery: "",
       filteredEmails: emails,
     });
+  },
+
+  fetchEmails: async (accessToken: string) => {
+    try {
+      set({ isLoading: true });
+      const { filters } = get();
+
+      // Build query parameters for server-side filtering
+      const params = new URLSearchParams();
+      if (filters.sender) {
+        params.append("sender", filters.sender);
+      }
+      if (filters.dateFrom) {
+        params.append("dateFrom", filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        params.append("dateTo", filters.dateTo);
+      }
+
+      const url = `/api/mail/inbox${params.toString() ? `?${params.toString()}` : ""}`;
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch emails");
+      }
+
+      const data = await response.json();
+      get().setEmails(data.emails || []);
+    } catch (error) {
+      console.error("Error fetching emails:", error);
+      toast.error("Failed to fetch emails");
+    } finally {
+      set({ isLoading: false });
+    }
   },
 
   updateComposeForm: (field, value) =>
@@ -211,7 +318,7 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
    * Executes actions returned by the OpenAI assistant
    * Includes validation, error handling, and user feedback via toasts
    */
-  executeAction: async (action) => {
+  executeAction: async (action, accessToken) => {
     let state = useMailStore.getState();
 
     switch (action.type) {
@@ -318,8 +425,15 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
         get().setFilters({
           sender: action.sender,
           dateRange: action.dateRange,
+          dateFrom: action.dateFrom,
+          dateTo: action.dateTo,
           unread: action.unread,
         });
+
+        // If accessToken provided, refetch emails from API with new filters
+        if (accessToken) {
+          await get().fetchEmails(accessToken);
+        }
         break;
 
       case "OPEN_EMAIL":
@@ -425,10 +539,10 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
     }
   },
 
-  executeActions: async (actions) => {
+  executeActions: async (actions, accessToken) => {
     // Execute actions sequentially with a delay for visual effect
     for (let i = 0; i < actions.length; i++) {
-      await useMailStore.getState().executeAction(actions[i]);
+      await useMailStore.getState().executeAction(actions[i], accessToken);
       // Add delay between actions (except for the last one)
       if (i < actions.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, 300));

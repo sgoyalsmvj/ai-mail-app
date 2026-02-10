@@ -8,7 +8,7 @@ import {
   GmailQuotaError,
 } from "@/lib/gmail-errors";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // Get the session to retrieve the access token
     const session = await getServerSession(authOptions);
@@ -20,8 +20,18 @@ export async function GET() {
       );
     }
 
-    // Fetch inbox emails using the access token
-    const emails = await fetchInboxEmails(session.accessToken);
+    // Parse query parameters for filtering
+    const { searchParams } = new URL(request.url);
+    const sender = searchParams.get("sender") || undefined;
+    const dateFrom = searchParams.get("dateFrom") || undefined;
+    const dateTo = searchParams.get("dateTo") || undefined;
+
+    // Fetch inbox emails using the access token with optional filters
+    const emails = await fetchInboxEmails(session.accessToken, {
+      sender,
+      dateFrom,
+      dateTo,
+    });
 
     return NextResponse.json({
       success: true,

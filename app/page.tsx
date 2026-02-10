@@ -24,34 +24,26 @@ export default function Home() {
     setCurrentView,
     sentEmails,
     setSentEmails,
+    filters,
+    fetchEmails: fetchEmailsFromStore,
   } = useMailStore();
   const [error, setError] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(false);
-  const fetchEmails = async () => {
-    if (!session) return;
+  const previousEmailCountRef = useRef<number>(0);
+  const isPollingRef = useRef<boolean>(false);
 
-    setIsLoading(true);
+  const fetchEmails = async () => {
+    if (!session?.accessToken) return;
+
     setError(null);
 
     try {
-      const response = await fetch("/api/mail/inbox");
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Session expired. Please sign in again.");
-        }
-        throw new Error("Failed to fetch emails");
-      }
-
-      const data = await response.json();
-      setEmails(data.emails || []);
+      await fetchEmailsFromStore(session.accessToken);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to fetch emails";
       setError(errorMessage);
       console.error("Error fetching emails:", err);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -83,31 +75,36 @@ export default function Home() {
     }
   };
 
-  // Email sync polling - track previous count for new email detection
-  const previousEmailCountRef = useRef<number>(0);
-
-  // Background email sync - polls every 30 seconds
+  // Background email sync with polling (respects current filters)
   useEffect(() => {
-    if (!session || status !== "authenticated") {
+    if (!session || status !== "authenticated" || !session.accessToken) {
       return;
     }
 
     const syncEmails = async () => {
+      if (!session.accessToken) return;
+
+      // Don't poll if:
+      // 1. Page is not visible (user switched tabs)
+      // 2. User is composing (disrupts their work)
+      // 3. User is viewing email detail (might be reading)
+      if (
+        document.hidden ||
+        currentView === "compose" ||
+        currentView === "detail"
+      ) {
+        return;
+      }
+
       try {
-        const response = await fetch("/api/mail/inbox");
-
-        if (!response.ok) {
-          // Silently fail - don't show errors for background sync
-          console.error("Background sync failed:", response.status);
-          return;
-        }
-
-        const data = await response.json();
-        const newEmails = data.emails || [];
-
-        // Compare email counts to detect new emails
+        isPollingRef.current = true;
         const previousCount = previousEmailCountRef.current;
-        const newCount = newEmails.length;
+
+        // Use the store's fetchEmails which respects current filters
+        await fetchEmailsFromStore(session.accessToken);
+
+        // Get updated email count from store
+        const newCount = useMailStore.getState().emails.length;
 
         if (previousCount > 0 && newCount > previousCount) {
           // New emails detected
@@ -120,12 +117,12 @@ export default function Home() {
           );
         }
 
-        // Update store with new emails
-        setEmails(newEmails);
         previousEmailCountRef.current = newCount;
       } catch (error) {
         // Silently fail for background sync
         console.error("Error syncing emails:", error);
+      } finally {
+        isPollingRef.current = false;
       }
     };
 
@@ -136,7 +133,7 @@ export default function Home() {
     return () => {
       clearInterval(intervalId);
     };
-  }, [session, status, setEmails]);
+  }, [session, status, fetchEmailsFromStore, currentView]);
 
   // Initialize email count ref
   useEffect(() => {
@@ -149,6 +146,15 @@ export default function Home() {
       fetchSentEmails();
     }
   }, [session, status]);
+
+  // Refetch emails when filters change (including when cleared)
+  useEffect(() => {
+    if (session && status === "authenticated" && !isPollingRef.current) {
+      // Fetch emails whenever filters change (set or cleared)
+      // This now includes sender, dateFrom, dateTo, and dateRange filters
+      fetchEmails();
+    }
+  }, [filters.sender, filters.dateFrom, filters.dateTo, filters.dateRange]);
 
   useEffect(() => {
     // Check localStorage and system preference
@@ -399,7 +405,7 @@ export default function Home() {
 
       {/* Assistant Panel Sidebar */}
       <aside className="hidden lg:block w-96 border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="h-screen sticky top-0">
+        <div className="h-screen sticky top-0 overflow-hidden">
           <AssistantPanel />
         </div>
       </aside>

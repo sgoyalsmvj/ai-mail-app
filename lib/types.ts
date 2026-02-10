@@ -37,16 +37,17 @@ export interface AppContext {
   composeForm?: ComposeForm;
 }
 
-
 export type AssistantAction =
   | { type: "OPEN_COMPOSE" }
   | { type: "FILL_COMPOSE"; to?: string; subject?: string; body?: string }
-  | { type: "SEND_EMAIL"; skipConfirmation?: boolean }  // ADD skipConfirmation flag
+  | { type: "SEND_EMAIL"; skipConfirmation?: boolean } // ADD skipConfirmation flag
   | {
       type: "FILTER_EMAILS";
-      sender?: string;
-      dateRange?: string;
-      unread?: boolean;
+      sender?: string | null;
+      dateRange?: string | null;
+      dateFrom?: string | null;
+      dateTo?: string | null;
+      unread?: boolean | null;
     }
   | { type: "OPEN_EMAIL"; emailId: string }
   | { type: "NAVIGATE"; view: View }
@@ -60,7 +61,9 @@ export interface AssistantResponse {
 }
 
 export interface EmailFilters {
-  sender?: string;
-  dateRange?: string;
-  unread?: boolean;
+  sender?: string | null;
+  dateRange?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  unread?: boolean | null;
 }

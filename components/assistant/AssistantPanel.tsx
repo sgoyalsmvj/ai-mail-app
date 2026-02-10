@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useMailStore } from "@/store/mailStore";
 import { Send, Bot, User, Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 
 interface Message {
   role: "user" | "assistant";
@@ -10,6 +11,7 @@ interface Message {
 }
 
 export default function AssistantPanel() {
+  const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -20,12 +22,16 @@ export default function AssistantPanel() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const { currentView, currentEmail, emails, executeActions } = useMailStore();
 
-  // Auto scroll to bottom when messages change
+  // Auto scroll to bottom when messages change using scrollTop instead of scrollIntoView
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight;
+    }
   }, [messages]);
 
   const buildContext = () => {
@@ -95,7 +101,7 @@ export default function AssistantPanel() {
       // Execute returned actions
       if (data.actions && data.actions.length > 0) {
         try {
-          await executeActions(data.actions);
+          await executeActions(data.actions, session?.accessToken);
 
           // Add success response to chat
           const assistantMessage =
@@ -163,7 +169,11 @@ export default function AssistantPanel() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+        style={{ overflowAnchor: "none" }}
+      >
         {messages.map((message, index) => (
           <div
             key={index}
