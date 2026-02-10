@@ -6,6 +6,14 @@ An intelligent email client that combines Gmail's power with AI-driven natural l
 ![TypeScript](https://img.shields.io/badge/TypeScript-0_errors-blue)
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
 
+## 🎥 Video Demo
+
+Watch the AI Mail App in action: [**View Demo Video**](https://drive.google.com/file/d/1t80RtGePUCBr1IFzYsIx3GtZoBBFzaU7/view?usp=sharing)
+
+See how natural language commands control your Gmail inbox, compose emails, and intelligently filter messages.
+
+---
+
 ## ✨ Features
 
 ### 🤖 AI Assistant Control
@@ -37,6 +45,7 @@ An intelligent email client that combines Gmail's power with AI-driven natural l
 ---
 
 ## 📋 Table of Contents
+- [Video Demo](#-video-demo)
 - [Setup Instructions](#-setup-instructions)
 - [Architecture](#-architecture)
 - [How It Works](#-how-it-works)
