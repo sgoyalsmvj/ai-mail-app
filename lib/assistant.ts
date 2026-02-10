@@ -31,8 +31,10 @@ WHEN TO INCLUDE SEND_EMAIL:
 ✅ "reply to this saying Y" → Include SEND_EMAIL  
 ✅ "email X about Y" → Include SEND_EMAIL
 ✅ "forward this to X" → Include SEND_EMAIL
+✅ "forward this email to X" → Include SEND_EMAIL
 ❌ "compose an email" → Omit SEND_EMAIL (drafting only)
 ❌ "draft a message" → Omit SEND_EMAIL (drafting only)
+❌ "just forward this" (without recipient) → Omit SEND_EMAIL
 
 DATE FILTERING:
 - Use "dateRange" for common presets: "today", "last_week" (7 days), "last_month" (30 days)
@@ -269,8 +271,10 @@ User: "Forward this to john@example.com" (while viewing an email)
 Response: {
   "actions": [
     { "type": "FORWARD_CURRENT" },
-    { "type": "FILL_COMPOSE", "to": "john@example.com" }
-  ]
+    { "type": "FILL_COMPOSE", "to": "john@example.com" },
+    { "type": "SEND_EMAIL" }
+  ],
+  "message": "Forwarding email to john@example.com. Please confirm to send."
 }
 
 User: "Open the latest email"
@@ -309,7 +313,18 @@ User: "Forward this email"
 Response: {
   "actions": [
     { "type": "FORWARD_CURRENT" }
-  ]
+  ],
+  "message": "I've opened the forward form. Add a recipient and send when ready."
+}
+
+User: "Forward this email to david@example.com and send"
+Response: {
+  "actions": [
+    { "type": "FORWARD_CURRENT" },
+    { "type": "FILL_COMPOSE", "to": "david@example.com" },
+    { "type": "SEND_EMAIL" }
+  ],
+  "message": "Forwarding email to david@example.com. Please confirm to send."
 }
 `;
 

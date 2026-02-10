@@ -133,7 +133,7 @@ export default function FilterBar() {
         {searchQuery && (
           <div className="flex items-center gap-1.5 rounded-md bg-blue-100 px-3 py-1.5 text-sm text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
             <Search className="h-3.5 w-3.5" />
-            <span className="max-w-[200px] truncate">{searchQuery}</span>
+            <span className="max-w-50 truncate">{searchQuery}</span>
           </div>
         )}
 
