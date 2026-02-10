@@ -29,7 +29,7 @@ export default function AssistantPanel() {
   }, [messages]);
 
   const buildContext = () => {
-    const { currentView, currentEmail, filteredEmails } =
+    const { currentView, currentEmail, filteredEmails, composeForm } =
       useMailStore.getState();
 
     const recentEmails = filteredEmails.slice(0, 5).map((email, index) => ({
@@ -47,9 +47,18 @@ export default function AssistantPanel() {
             id: currentEmail.id,
             from: currentEmail.from,
             subject: currentEmail.subject,
+            date: currentEmail.date,
           }
         : undefined,
       recentEmails,
+      composeForm:
+        composeForm.to || composeForm.subject || composeForm.body
+          ? {
+              to: composeForm.to,
+              subject: composeForm.subject,
+              body: composeForm.body,
+            }
+          : undefined,
     };
   };
 

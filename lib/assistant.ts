@@ -35,7 +35,19 @@ When user wants to open an email by reference:
 - "email from [name]" → Use emailId: "from:Name"
 - "third email" or "email number 3" → Use emailId: "index:2" (zero-indexed)
 
-Context will be provided with each request.
+CONTEXT-AWARE BEHAVIOR:
+- When user says "reply to this" and an email is currently open, use REPLY_TO_CURRENT
+- When user says "forward this" and an email is open, use FORWARD_CURRENT
+- When user references "the second email" or "email number 2", use OPEN_EMAIL with index:1
+- Context includes current view, open email details, and list of recent emails
+
+Context will be provided with each request in this format:
+- View: [current view]
+- Open email: [if viewing an email]
+  From: [sender]
+  Subject: [subject]
+- Recent emails: [numbered list of recent emails]
+- Compose form: [if compose form has content]
 
 Examples:
 User: "Send email to john@example.com about meeting"
@@ -137,6 +149,28 @@ User: "Navigate to inbox"
 Response: {
   "actions": [
     { "type": "NAVIGATE", "view": "inbox" }
+  ]
+}
+
+User: "Reply to this" (while viewing an email)
+Response: {
+  "actions": [
+    { "type": "REPLY_TO_CURRENT" }
+  ]
+}
+
+User: "Open the second email" (with recent emails in context)
+Response: {
+  "actions": [
+    { "type": "OPEN_EMAIL", "emailId": "index:1" }
+  ]
+}
+
+User: "Forward this to john@example.com" (while viewing an email)
+Response: {
+  "actions": [
+    { "type": "FORWARD_CURRENT" },
+    { "type": "FILL_COMPOSE", "to": "john@example.com" }
   ]
 }
 
@@ -251,11 +285,10 @@ Respond with JSON containing an array of actions to execute.`,
  * @returns Formatted context string
  */
 function buildContextString(context: AppContext): string {
-  let contextString = `- Current view: ${context.currentView}\n`;
+  let contextString = `View: ${context.currentView}\n`;
 
   if (context.currentEmail) {
-    contextString += `- Currently viewing email:\n`;
-    contextString += `  ID: ${context.currentEmail.id}\n`;
+    contextString += `\nOpen email:\n`;
     contextString += `  From: ${context.currentEmail.from}\n`;
     contextString += `  Subject: ${context.currentEmail.subject}\n`;
     if (context.currentEmail.date) {
@@ -263,15 +296,30 @@ function buildContextString(context: AppContext): string {
     }
   }
 
-  if (context.currentEmailId) {
-    contextString += `- Current email ID: ${context.currentEmailId}\n`;
+  if (context.recentEmails && context.recentEmails.length > 0) {
+    contextString += `\nRecent emails:\n`;
+    context.recentEmails.forEach((email, i) => {
+      contextString += `  ${i + 1}. From ${email.from}: "${email.subject}"\n`;
+    });
   }
 
-  if (context.recentEmails && context.recentEmails.length > 0) {
-    contextString += `- Recent emails in inbox:\n`;
-    context.recentEmails.forEach((email, i) => {
-      contextString += `  ${i + 1}. From ${email.from}: "${email.subject}" (ID: ${email.id})\n`;
-    });
+  if (
+    context.composeForm &&
+    (context.composeForm.to ||
+      context.composeForm.subject ||
+      context.composeForm.body)
+  ) {
+    contextString += `\nCompose form state:\n`;
+    if (context.composeForm.to) {
+      contextString += `  To: ${context.composeForm.to}\n`;
+    }
+    if (context.composeForm.subject) {
+      contextString += `  Subject: ${context.composeForm.subject}\n`;
+    }
+    if (context.composeForm.body) {
+      const preview = context.composeForm.body.substring(0, 50);
+      contextString += `  Body: ${preview}${context.composeForm.body.length > 50 ? "..." : ""}\n`;
+    }
   }
 
   return contextString;
