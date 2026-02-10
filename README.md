@@ -20,9 +20,12 @@ An intelligent email client that combines Gmail's power with AI-driven natural l
 - **OAuth Authentication**: Secure Google account login
 
 ### 🎯 Advanced Features
-- **Smart Filters**: Filter by sender, date range, unread status, or search keywords
-- **Quick Reply**: Reply to emails with AI assistance
+- **Smart Filters**: Server-side filtering by sender (Gmail API), date range, unread status
+- **Intelligent Search**: Client-side search with visual badges and unified filter clearing
+- **Smart Polling**: Auto-pauses when tab hidden, composing, or reading emails (saves API calls)
+- **Quick Reply & Forward**: AI-assisted replies and forwards with confirmation modal
 - **Compose Assistance**: AI helps fill in recipients, subjects, and message body
+- **Context-Aware Actions**: AI clears filters when needed (e.g., "show latest email" after filtering)
 
 
 ### 🛡️ Production-Ready
@@ -217,23 +220,28 @@ Dispatcher executes actions sequentially:
 ### Core Components
 
 #### 1. Mail Service Layer (`lib/gmail.ts`)
-- **Responsibility**: Gmail API integration
+- **Responsibility**: Gmail API integration with server-side filtering
 - **Functions**:
-  - `fetchInboxEmails()` - Retrieves emails with retry logic
+  - `fetchInboxEmails(accessToken, options)` - Retrieves emails with filters
+  - `buildGmailQuery()` - Constructs Gmail search queries (from:, after:, before:)
   - Integration with custom error classes
+- **Server-Side Filtering**: Uses Gmail API operators for sender and date filtering
 - **Error Handling**: Exponential backoff, typed errors
 
 #### 2. UI State Layer (`store/mailStore.ts`)
-- **Responsibility**: Centralized state management
+- **Responsibility**: Centralized state management and action orchestration
 - **State**:
-  - `emails[]` - Inbox messages
+  - `emails[]` - Inbox messages (filtered server-side)
+  - `filteredEmails[]` - Client-side search/unread filtering
   - `currentEmail` - Selected email for viewing
   - `composeForm` - Draft email data
-  - `filters` - Active filter settings
+  - `filters` - Active filter settings (sender, dateFrom, dateTo, dateRange, unread)
+  - `searchQuery` - Active search text
 - **Actions**:
-  - `fetchEmails()` - Load inbox
-  - `applyFilters()` - Filter email list
-  - `executeAction()` - AI action dispatcher
+  - `fetchEmails(accessToken)` - Load inbox with server-side filters
+  - `applyFilters()` - Apply client-side filters (search, unread)
+  - `executeAction(action, accessToken)` - AI action dispatcher with async support
+  - `setFilters()` - Update filters and trigger API refetch
 
 #### 3. AI Command Layer (`lib/assistant.ts`)
 - **Responsibility**: Natural language processing
@@ -320,11 +328,11 @@ case "SEND_EMAIL":
   break;
 ```
 
-### Example 2: Filtering Emails
+### Example 2: Server-Side Filtering
 
 **User Command:**
 ```
-"Show me unread emails from this week"
+"Find emails from saurabh goyal from last week"
 ```
 
 **AI Response:**
@@ -333,34 +341,44 @@ case "SEND_EMAIL":
   "actions": [
     {
       "type": "FILTER_EMAILS",
-      "unread": true,
-      "dateFrom": "2026-02-04"
+      "sender": "saurabh goyal",
+      "dateRange": "last_week"
     }
   ],
-  "message": "Showing unread emails from this week"
+  "message": "Showing emails from saurabh goyal from the last 7 days"
 }
 ```
 
 **Code Execution:**
 ```typescript
-// In store/mailStore.ts - applyFilters()
-const applyFilters = (): Email[] => {
-  let filtered = [...emails];
+// In store/mailStore.ts - executeAction()
+case "FILTER_EMAILS":
+  get().setFilters({
+    sender: action.sender,
+    dateRange: action.dateRange
+  });
   
-  // Apply unread filter
-  if (filters.unread) {
-    filtered = filtered.filter(email => email.labelIds?.includes("UNREAD"));
+  // If accessToken provided, refetch from Gmail API with filters
+  if (accessToken) {
+    await get().fetchEmails(accessToken);
   }
+  break;
+
+// In store/mailStore.ts - fetchEmails()
+const fetchEmails = async (accessToken: string) => {
+  const { filters } = get();
   
-  // Apply date filter
-  if (filters.dateFrom) {
-    const fromDate = new Date(filters.dateFrom).getTime();
-    filtered = filtered.filter(email => 
-      new Date(email.date).getTime() >= fromDate
-    );
-  }
+  // Build query params for server-side filtering
+  const params = new URLSearchParams();
+  if (filters.sender) params.append("sender", filters.sender);
+  if (filters.dateFrom) params.append("dateFrom", filters.dateFrom);
   
-  return filtered;
+  // Gmail API filters emails server-side using from: and after: operators
+  const response = await fetch(`/api/mail/inbox?${params}`);
+  const data = await response.json();
+  
+  // Only matching emails are returned
+  set({ emails: data.emails });
 };
 ```
 
@@ -426,18 +444,23 @@ case "REPLY_TO_CURRENT":
 
 ### 1. Polling vs Pub/Sub for Email Updates
 
-**Decision: Polling (30-second interval)**
+**Decision: Smart Polling (30-second interval)**
 
 **Why:**
 - ✅ Simpler implementation - no WebSocket server needed
 - ✅ Faster to build for MVP/prototype
 - ✅ Works well with Next.js serverless architecture
 - ✅ Good enough for demo purposes (30s delay acceptable)
+- ✅ **Smart pausing**: Auto-pauses when:
+  - Tab is not visible (document.hidden)
+  - User is composing an email
+  - User is viewing email details
+- ✅ **Filter-aware**: Respects active filters (sender, date range)
 
 **Trade-offs:**
 - ❌ Not real-time (delay up to 30 seconds)
-- ❌ More API calls than necessary
-- ❌ Higher quota usage
+- ✅ Optimized API calls (pauses when not needed)
+- ✅ Reduced quota usage vs continuous polling
 
 **Production Alternative:**
 - Use Gmail Pub/Sub push notifications
@@ -509,6 +532,41 @@ case "REPLY_TO_CURRENT":
 - ❌ OpenAI API key exposed to client (rate limiting concerns)
 - ✅ For production: Move to server-side API route
 
+### 6. Hybrid Filtering: Server-Side + Client-Side
+
+**Decision: Server-side for sender/date, client-side for search/unread**
+
+**Why:**
+- ✅ **Server-side (Gmail API)**:
+  - Sender filtering uses `from:` operator
+  - Date filtering uses `after:` and `before:` operators
+  - Reduces data transfer (only matching emails returned)
+  - Scales well with large inboxes
+- ✅ **Client-side (JavaScript)**:
+  - Search query (subject/from/snippet matching)
+  - Unread status filter
+  - Instant filtering without API calls
+  - Good for quick UI interactions
+
+**Architecture:**
+```typescript
+// Server-side: Gmail API query
+GET /api/mail/inbox?sender=john&dateFrom=2026-02-01
+→ Gmail filters: "from:john after:2026/02/01"
+→ Returns 10 emails
+
+// Client-side: Apply search/unread
+filteredEmails = emails
+  .filter(e => e.subject.includes(searchQuery))
+  .filter(e => filters.unread ? !e.isRead : true)
+→ Display 5 emails
+```
+
+**Trade-offs:**
+- ✅ Best of both worlds (performance + flexibility)
+- ✅ Reduced API quota usage
+- ❌ Slightly more complex logic
+
 ---
 
 ## ⚠️ Known Limitations
@@ -520,8 +578,9 @@ case "REPLY_TO_CURRENT":
 - **Basic Formatting**: HTML emails rendered but no compose formatting tools
 
 ### Real-time Sync
-- **Polling Delay**: Email updates take up to 30 seconds
-- **No Push Notifications**: Won't know about new emails immediately
+- **Smart Polling**: 30-second intervals, auto-pauses when tab hidden/composing/reading
+- **Filter-Aware Sync**: Polling respects active filters (dates, sender)
+- **No Push Notifications**: Won't know about new emails immediately (requires page visibility)
 
 ### AI Capabilities
 - **Action Vocabulary**: Limited to 7 predefined actions
@@ -534,7 +593,9 @@ case "REPLY_TO_CURRENT":
 - **Read Scope Limited**: Only inbox, not sent/drafts/trash
 
 ### Performance
-- **Large Inboxes**: No pagination - loads all emails at once
+- **Server-Side Filtering**: Sender and date filters use Gmail API (reduces data transfer)
+- **Smart API Usage**: Polling pauses when not needed (tab hidden, other views)
+- **Large Inboxes**: No pagination - loads all emails at once (mitigated by server-side filtering)
 - **Image Loading**: Email images might be slow to load
 - **No Offline Mode**: Requires internet connection
 
@@ -575,10 +636,11 @@ case "REPLY_TO_CURRENT":
    - Quick insert template
    - AI-powered template generation
 
-7. **Better Search**
-   - Full-text search across email body
+7. **Server-Side Search**
+   - Move search to Gmail API for full-text body search
    - Search by attachments
-   - Advanced filters (has:attachment, is:starred)
+   - Advanced Gmail operators (has:attachment, is:starred, subject:)
+   - Currently: Client-side search on fetched emails only
 
 8. **Multi-Account Support**
    - Switch between Gmail accounts
