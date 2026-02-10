@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useMailStore } from "@/store/mailStore";
 import EmailList from "@/components/mail/EmailList";
@@ -10,6 +10,8 @@ import AssistantPanel from "@/components/assistant/AssistantPanel";
 import { Inbox, RefreshCw, LogOut, PenSquare } from "lucide-react";
 import FilterBar from "@/components/mail/FilterBar";
 import SearchBar from "@/components/mail/SearchBar";
+import { toast } from "sonner";
+import { Moon, Sun } from "lucide-react";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -24,7 +26,7 @@ export default function Home() {
     setSentEmails,
   } = useMailStore();
   const [error, setError] = useState<string | null>(null);
-
+  const [darkMode, setDarkMode] = useState(false);
   const fetchEmails = async () => {
     if (!session) return;
 
@@ -80,6 +82,66 @@ export default function Home() {
       setIsLoading(false);
     }
   };
+
+  // Email sync polling - track previous count for new email detection
+  const previousEmailCountRef = useRef<number>(0);
+
+  // Background email sync - polls every 30 seconds
+  useEffect(() => {
+    if (!session || status !== "authenticated") {
+      return;
+    }
+
+    const syncEmails = async () => {
+      try {
+        const response = await fetch("/api/mail/inbox");
+
+        if (!response.ok) {
+          // Silently fail - don't show errors for background sync
+          console.error("Background sync failed:", response.status);
+          return;
+        }
+
+        const data = await response.json();
+        const newEmails = data.emails || [];
+
+        // Compare email counts to detect new emails
+        const previousCount = previousEmailCountRef.current;
+        const newCount = newEmails.length;
+
+        if (previousCount > 0 && newCount > previousCount) {
+          // New emails detected
+          const newEmailCount = newCount - previousCount;
+          toast.success(
+            `${newEmailCount} new email${newEmailCount > 1 ? "s" : ""} received! 📧`,
+            {
+              duration: 4000,
+            },
+          );
+        }
+
+        // Update store with new emails
+        setEmails(newEmails);
+        previousEmailCountRef.current = newCount;
+      } catch (error) {
+        // Silently fail for background sync
+        console.error("Error syncing emails:", error);
+      }
+    };
+
+    // Set up polling interval (30 seconds)
+    const intervalId = setInterval(syncEmails, 30000);
+
+    // Cleanup on unmount
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [session, status, setEmails]);
+
+  // Initialize email count ref
+  useEffect(() => {
+    previousEmailCountRef.current = emails.length;
+  }, [emails.length]);
   // Fetch emails on mount when user is authenticated
   useEffect(() => {
     if (session && status === "authenticated") {
@@ -87,6 +149,34 @@ export default function Home() {
       fetchSentEmails();
     }
   }, [session, status]);
+
+  useEffect(() => {
+    // Check localStorage and system preference
+    const isDark =
+      localStorage.getItem("theme") === "dark" ||
+      (!localStorage.getItem("theme") &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+    setDarkMode(isDark);
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+
+    if (newMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  };
 
   // Loading state for authentication
   if (status === "loading") {
@@ -227,6 +317,20 @@ export default function Home() {
                     className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
                   />
                   <span className="hidden sm:inline">Refresh</span>
+                </button>
+                <button
+                  onClick={toggleDarkMode}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  title="Toggle dark mode"
+                >
+                  {darkMode ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Moon className="h-4 w-4" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {darkMode ? "Light" : "Dark"}
+                  </span>
                 </button>
 
                 <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>

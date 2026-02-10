@@ -4,6 +4,7 @@ import { useMailStore } from "@/store/mailStore";
 import { ArrowLeft, Send, Loader2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import ConfirmationModal from "./ConfirmationModal";
+import { validateComposeForm } from "@/lib/validation";
 
 export default function ComposeForm() {
   const {
@@ -68,33 +69,19 @@ export default function ComposeForm() {
     setCurrentView("inbox");
   };
 
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
   const handleSend = async () => {
-    // Validate fields
+    // Validate fields using validation utility
     setError(null);
     setSuccess(false);
 
-    if (!composeForm.to.trim()) {
-      setError("Recipient email is required");
-      return;
-    }
+    const validation = validateComposeForm(
+      composeForm.to,
+      composeForm.subject,
+      composeForm.body,
+    );
 
-    if (!validateEmail(composeForm.to.trim())) {
-      setError("Please enter a valid email address");
-      return;
-    }
-
-    if (!composeForm.subject.trim()) {
-      setError("Subject is required");
-      return;
-    }
-
-    if (!composeForm.body.trim()) {
-      setError("Email body cannot be empty");
+    if (!validation.isValid) {
+      setError(validation.error || "Validation failed");
       return;
     }
 

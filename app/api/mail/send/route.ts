@@ -2,6 +2,12 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { sendEmail } from "@/lib/gmail";
+import {
+  GmailAuthError,
+  GmailRateLimitError,
+  GmailQuotaError,
+} from "@/lib/gmail-errors";
+import { validateComposeForm } from "@/lib/validation";
 
 export async function POST(request: Request) {
   try {
@@ -32,26 +38,19 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { to, subject, body: emailBody } = body;
 
-    // Validate required fields
-    if (!to || !subject || !emailBody) {
-      return NextResponse.json(
-        { error: "Missing required fields: to, subject, body" },
-        { status: 400 },
-      );
-    }
+    // Validate all fields using validation utility
+    const validation = validateComposeForm(to, subject, emailBody);
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(to)) {
+    if (!validation.isValid) {
       return NextResponse.json(
-        { error: "Invalid email address" },
+        { error: validation.error || "Validation failed" },
         { status: 400 },
       );
     }
 
     // Send email using Gmail API
     console.log(`Sending email to ${to} with subject: ${subject}`);
-    await sendEmail(accessToken, to, subject, emailBody);
+    await sendEmail(accessToken, to.trim(), subject.trim(), emailBody.trim());
 
     return NextResponse.json(
       { success: true, message: "Email sent successfully" },
@@ -59,6 +58,36 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Error in send email API:", error);
+
+    // Handle specific Gmail error types
+    if (error instanceof GmailAuthError) {
+      return NextResponse.json(
+        {
+          error:
+            "Authentication failed. Your session has expired. Please sign in again.",
+        },
+        { status: 401 },
+      );
+    }
+
+    if (error instanceof GmailRateLimitError) {
+      return NextResponse.json(
+        {
+          error:
+            "Rate limit exceeded. Please wait a moment before trying again.",
+        },
+        { status: 429 },
+      );
+    }
+
+    if (error instanceof GmailQuotaError) {
+      return NextResponse.json(
+        { error: "Gmail API quota exceeded. Please try again later." },
+        { status: 403 },
+      );
+    }
+
+    // Generic error fallback
     return NextResponse.json(
       { error: "Failed to send email. Please try again." },
       { status: 500 },

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { AssistantResponse, AppContext } from "./types";
+import { retryWithBackoff, isRetryableError } from "./retry";
 
 const SYSTEM_PROMPT = `You are an AI assistant that controls a mail UI.
 You must respond ONLY with valid JSON containing an array of actions.
@@ -239,14 +240,24 @@ Respond with JSON containing an array of actions to execute.`,
       },
     ];
 
-    // Call OpenAI with structured output
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: messages,
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 500,
-    });
+    // Call OpenAI with retry logic and exponential backoff
+    const completion = await retryWithBackoff(
+      async () => {
+        return await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: messages,
+          response_format: { type: "json_object" },
+          temperature: 0.7,
+          max_tokens: 500,
+        });
+      },
+      {
+        maxRetries: 3,
+        initialDelay: 1000,
+        maxDelay: 10000,
+        shouldRetry: isRetryableError,
+      },
+    );
 
     // Parse the response
     const responseContent = completion.choices[0]?.message?.content;
@@ -270,11 +281,35 @@ Respond with JSON containing an array of actions to execute.`,
   } catch (error) {
     console.error("Error in processCommand:", error);
 
+    // Provide specific error messages based on error type
+    let fallbackMessage =
+      "I'm sorry, I encountered an error processing your command. Please try again.";
+
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase();
+
+      if (message.includes("rate limit") || message.includes("429")) {
+        fallbackMessage =
+          "I'm receiving too many requests right now. Please wait a moment and try again.";
+      } else if (message.includes("timeout")) {
+        fallbackMessage =
+          "The request took too long. Please try again with a simpler command.";
+      } else if (
+        message.includes("api key") ||
+        message.includes("authentication")
+      ) {
+        fallbackMessage =
+          "There's a configuration issue. Please contact support.";
+      } else if (message.includes("network")) {
+        fallbackMessage =
+          "Network error. Please check your connection and try again.";
+      }
+    }
+
     // Return fallback response
     return {
       actions: [],
-      message:
-        "I'm sorry, I encountered an error processing your command. Please try again.",
+      message: fallbackMessage,
     };
   }
 }

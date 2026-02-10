@@ -1,4 +1,10 @@
 import { Email } from "./types";
+import {
+  handleGmailError,
+  GmailNetworkError,
+  isGmailRetryableError,
+} from "./gmail-errors";
+import { retryWithBackoff } from "./retry";
 
 // Helper function to parse email headers
 const parseHeaders = (headers: any[]) => {
@@ -52,77 +58,89 @@ const extractBody = (payload: any): string => {
 // Fetch inbox emails with full details
 const fetchInboxEmails = async (accessToken: string): Promise<Email[]> => {
   try {
-    // Step 1: Fetch list of message IDs
-    const listResponse = await fetch(
-      "https://www.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=10",
+    return await retryWithBackoff(
+      async () => {
+        // Step 1: Fetch list of message IDs
+        const listResponse = await fetch(
+          "https://www.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=10",
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          },
+        ).catch((error) => {
+          throw new GmailNetworkError(`Network error: ${error.message}`);
+        });
+
+        if (!listResponse.ok) {
+          const errorData = await listResponse.json().catch(() => ({}));
+          console.error("Gmail API error:", {
+            status: listResponse.status,
+            statusText: listResponse.statusText,
+            error: errorData,
+          });
+          handleGmailError(listResponse, errorData);
+        }
+
+        const listData = await listResponse.json();
+        const messages = listData.messages || [];
+
+        if (messages.length === 0) {
+          return [];
+        }
+
+        // Step 2: Fetch full details for each message
+        const emailPromises = messages.map(async (message: any) => {
+          const detailResponse = await fetch(
+            `https://www.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+            },
+          ).catch((error) => {
+            console.error(`Network error fetching email ${message.id}:`, error);
+            return null;
+          });
+
+          if (!detailResponse || !detailResponse.ok) {
+            console.error(`Failed to fetch email ${message.id}`);
+            return null;
+          }
+
+          const emailData = await detailResponse.json();
+
+          // Step 3: Parse headers
+          const headers = parseHeaders(emailData.payload.headers);
+
+          // Step 4: Extract body
+          const body = extractBody(emailData.payload);
+
+          // Step 5: Build Email object
+          const email: Email = {
+            id: emailData.id,
+            from: headers.from || "Unknown",
+            to: headers.to || "",
+            subject: headers.subject || "(No Subject)",
+            snippet: emailData.snippet || "",
+            body: body || emailData.snippet || "",
+            date: headers.date || new Date().toISOString(),
+            isRead: !emailData.labelIds?.includes("UNREAD"),
+            labels: emailData.labelIds || [],
+          };
+
+          return email;
+        });
+
+        const emails = await Promise.all(emailPromises);
+        return emails.filter((email): email is Email => email !== null);
+      },
       {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        maxRetries: 2,
+        initialDelay: 1000,
+        shouldRetry: isGmailRetryableError,
       },
     );
-
-    if (!listResponse.ok) {
-      const errorData = await listResponse.json().catch(() => ({}));
-      console.error("Gmail API error:", {
-        status: listResponse.status,
-        statusText: listResponse.statusText,
-        error: errorData,
-      });
-      throw new Error(
-        `Failed to fetch email list: ${listResponse.status} ${listResponse.statusText} - ${JSON.stringify(errorData)}`,
-      );
-    }
-
-    const listData = await listResponse.json();
-    const messages = listData.messages || [];
-
-    if (messages.length === 0) {
-      return [];
-    }
-
-    // Step 2: Fetch full details for each message
-    const emailPromises = messages.map(async (message: any) => {
-      const detailResponse = await fetch(
-        `https://www.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
-      );
-
-      if (!detailResponse.ok) {
-        console.error(`Failed to fetch email ${message.id}`);
-        return null;
-      }
-
-      const emailData = await detailResponse.json();
-
-      // Step 3: Parse headers
-      const headers = parseHeaders(emailData.payload.headers);
-
-      // Step 4: Extract body
-      const body = extractBody(emailData.payload);
-
-      // Step 5: Build Email object
-      const email: Email = {
-        id: emailData.id,
-        from: headers.from || "Unknown",
-        to: headers.to || "",
-        subject: headers.subject || "(No Subject)",
-        snippet: emailData.snippet || "",
-        body: body || emailData.snippet || "",
-        date: headers.date || new Date().toISOString(),
-        isRead: !emailData.labelIds?.includes("UNREAD"),
-        labels: emailData.labelIds || [],
-      };
-
-      return email;
-    });
-
-    const emails = await Promise.all(emailPromises);
-    return emails.filter((email): email is Email => email !== null);
   } catch (error) {
     console.error("Error fetching inbox emails:", error);
     throw error;
