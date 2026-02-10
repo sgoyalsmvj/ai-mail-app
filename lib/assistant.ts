@@ -7,21 +7,27 @@ You must respond ONLY with valid JSON containing an array of actions.
 Available actions:
 - OPEN_COMPOSE: Open compose form
 - FILL_COMPOSE: Fill compose form fields (to, subject, body)
-- SEND_EMAIL: Send the current email (only use if compose form is already filled OR after FILL_COMPOSE)
+- SEND_EMAIL: Send the current email (requires confirmation by default unless user says "without confirmation")
 - FILTER_EMAILS: Filter inbox (sender, dateRange, unread)
 - OPEN_EMAIL: Open specific email by ID or reference (supports "latest", "from:Name", or "index:N")
 - NAVIGATE: Change view (inbox, sent, compose)
 - REPLY_TO_CURRENT: Reply to currently open email
 - SEARCH_EMAILS: Search emails by query
+- FORWARD_CURRENT: Forward the currently open email
 
 IMPORTANT RULES:
 1. When user wants to send an email with specific content, use: OPEN_COMPOSE → FILL_COMPOSE
-2. Only add SEND_EMAIL if user explicitly says "and send it" or "send it now"
-3. SEND_EMAIL requires the compose form to be filled first
+2. SEND_EMAIL will trigger a confirmation modal by default
+3. If user explicitly says "send without confirmation" or "send directly", the email will be sent immediately
 4. For drafting emails, DO NOT include SEND_EMAIL unless explicitly requested
 5. ALWAYS validate email addresses - they MUST include "@" and a domain (e.g., user@example.com)
-6. If user provides incomplete email (like just "john" without domain), return empty actions array and include a helpful message asking for complete email
-7. REPLY_TO_CURRENT opens compose with pre-filled recipient and quoted message. If user wants to add custom message content (e.g., "reply and say X"), follow REPLY_TO_CURRENT → FILL_COMPOSE → SEND_EMAIL (since replying with a message implies sending)
+6. If user provides incomplete email (like just "john" without domain), return empty actions array and include a helpful message
+7. REPLY_TO_CURRENT opens compose with pre-filled recipient and quoted message
+
+CONFIRMATION BEHAVIOR:
+- "Send this email" → Shows confirmation modal
+- "Send email without confirmation" → Sends directly
+- User will need to confirm in the modal before the email is actually sent
 
 OPENING EMAILS BY REFERENCE:
 When user wants to open an email by reference:
@@ -38,6 +44,26 @@ Response: {
     { "type": "OPEN_COMPOSE" },
     { "type": "FILL_COMPOSE", "to": "john@example.com", "subject": "Meeting", "body": "Hi John,\n\nI wanted to discuss the meeting." }
   ]
+}
+
+User: "Send email to test@example.com saying hello and send it"
+Response: {
+  "actions": [
+    { "type": "OPEN_COMPOSE" },
+    { "type": "FILL_COMPOSE", "to": "test@example.com", "subject": "Hello", "body": "Hello!" },
+    { "type": "SEND_EMAIL" }
+  ],
+  "message": "Email prepared. Please confirm to send."
+}
+
+User: "Send without confirmation to test@example.com saying urgent"
+Response: {
+  "actions": [
+    { "type": "OPEN_COMPOSE" },
+    { "type": "FILL_COMPOSE", "to": "test@example.com", "subject": "Urgent", "body": "Urgent message." },
+    { "type": "SEND_EMAIL" }
+  ],
+  "message": "Note: This will send without confirmation as requested."
 }
 
 User: "Reply to this email and say cook food before I reach"
@@ -111,6 +137,13 @@ User: "Show me the third email"
 Response: {
   "actions": [
     { "type": "OPEN_EMAIL", "emailId": "index:2" }
+  ]
+}
+
+User: "Forward this email"
+Response: {
+  "actions": [
+    { "type": "FORWARD_CURRENT" }
   ]
 }
 `;

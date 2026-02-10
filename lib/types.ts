@@ -34,12 +34,14 @@ export interface AppContext {
     subject: string;
     date: string;
   }>;
+  composeForm?: ComposeForm;
 }
+
 
 export type AssistantAction =
   | { type: "OPEN_COMPOSE" }
   | { type: "FILL_COMPOSE"; to?: string; subject?: string; body?: string }
-  | { type: "SEND_EMAIL" }
+  | { type: "SEND_EMAIL"; skipConfirmation?: boolean }  // ADD skipConfirmation flag
   | {
       type: "FILTER_EMAILS";
       sender?: string;
@@ -49,7 +51,8 @@ export type AssistantAction =
   | { type: "OPEN_EMAIL"; emailId: string }
   | { type: "NAVIGATE"; view: View }
   | { type: "REPLY_TO_CURRENT" }
-  | { type: "SEARCH_EMAILS"; query: string };
+  | { type: "SEARCH_EMAILS"; query: string }
+  | { type: "FORWARD_CURRENT" };
 
 export interface AssistantResponse {
   actions: AssistantAction[];

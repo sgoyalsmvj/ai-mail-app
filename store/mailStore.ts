@@ -18,6 +18,8 @@ interface MailStoreState {
   isLoading: boolean;
   filters: Partial<EmailFilters>;
   searchQuery: string;
+  requiresConfirmation: boolean;
+  showConfirmationModal: boolean;
 
   // Actions
   setEmails: (emails: Email[]) => void;
@@ -27,6 +29,9 @@ interface MailStoreState {
   resetComposeForm: () => void;
   setIsLoading: (isLoading: boolean) => void;
   setSearchQuery: (query: string) => void;
+  setRequiresConfirmation: (requires: boolean) => void;
+  setShowConfirmationModal: (show: boolean) => void;
+  confirmAndSendEmail: () => Promise<void>;
 
   // Filter Actions
   setFilters: (filters: Partial<EmailFilters>) => void;
@@ -54,6 +59,9 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
   isLoading: false,
   filters: {},
   searchQuery: "",
+  requiresConfirmation: true,
+  showConfirmationModal: false,
+
   setSearchQuery: (query: string) => {
     set({ searchQuery: query });
     get().applyFilters();
@@ -61,6 +69,44 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
   setEmails: (emails: Email[]) => {
     set({ emails, filteredEmails: emails });
     get().applyFilters(); // Apply any existing filters
+  },
+
+  setRequiresConfirmation: (required: boolean) =>
+    set({ requiresConfirmation: required }),
+
+  setShowConfirmationModal: (show: boolean) =>
+    set({ showConfirmationModal: show }),
+
+  confirmAndSendEmail: async () => {
+    const { composeForm } = get();
+    try {
+      const response = await fetch("/api/mail/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: composeForm.to,
+          subject: composeForm.subject,
+          body: composeForm.body,
+        }),
+      });
+      if (response.ok) {
+        toast.success("Email sent successfully! 📧");
+        set({
+          composeForm: initialComposeForm,
+          currentView: "inbox",
+          showConfirmationModal: false,
+        });
+      } else {
+        const errorData = await response.json();
+        toast.error(
+          `Failed to send email: ${errorData.error || "Unknown error"}`,
+        );
+        console.error("Failed to send email:", errorData);
+      }
+    } catch (error) {
+      console.error("Failed to send email:", error);
+      toast.error("Failed to send email. Please try again.");
+    }
   },
 
   setCurrentView: (view) => set({ currentView: view }),
@@ -209,25 +255,24 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
 
       case "SEND_EMAIL":
         // Trigger the send email flow
+
+        const { composeForm, requiresConfirmation } = state;
+        const skipConfirmation = action.skipConfirmation || false;
+        // Validate form before sending
+        if (!composeForm.to || !composeForm.subject || !composeForm.body) {
+          toast.error("Please fill in all email fields before sending");
+          console.error(
+            "Cannot send email: missing required fields",
+            composeForm,
+          );
+          break;
+        }
+        if (requiresConfirmation && !skipConfirmation) {
+          toast.info("Please confirm before sending the email...");
+          set({ showConfirmationModal: true });
+          break;
+        }
         try {
-          const { composeForm } = state;
-
-          // Validate form before sending
-          if (!composeForm.to || !composeForm.subject || !composeForm.body) {
-            toast.error("Please fill in all email fields before sending");
-            console.error(
-              "Cannot send email: missing required fields",
-              composeForm,
-            );
-            break;
-          }
-
-          console.log("Sending email with data:", {
-            to: composeForm.to,
-            subject: composeForm.subject,
-            bodyLength: composeForm.body.length,
-          });
-
           const response = await fetch("/api/mail/send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -335,6 +380,27 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
       case "SEARCH_EMAILS":
         toast.info(`Searching for: "${action.query}"`);
         get().setSearchQuery(action.query);
+        break;
+
+      case "FORWARD_CURRENT":
+        if (state.currentEmail) {
+          toast.success("Preparing forward...");
+          const { subject, body, from, date } = state.currentEmail;
+
+          set({
+            composeForm: {
+              to: "",
+              subject: subject.startsWith("Fwd: ")
+                ? subject
+                : `Fwd: ${subject}`,
+              body: `\n\n---\nForwarded message from ${from} on ${date}:\nSubject: ${subject}\n\n${body}`,
+            },
+            currentView: "compose",
+          });
+        } else {
+          toast.error("No email to forward");
+          console.error("No email to forward");
+        }
         break;
 
       default:

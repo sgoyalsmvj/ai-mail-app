@@ -3,10 +3,18 @@
 import { useMailStore } from "@/store/mailStore";
 import { ArrowLeft, Send, Loader2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import ConfirmationModal from "./ConfirmationModal";
 
 export default function ComposeForm() {
-  const { composeForm, updateComposeForm, resetComposeForm, setCurrentView } =
-    useMailStore();
+  const {
+    composeForm,
+    updateComposeForm,
+    resetComposeForm,
+    setCurrentView,
+    confirmAndSendEmail,
+    showConfirmationModal,
+    setShowConfirmationModal,
+  } = useMailStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -242,6 +250,13 @@ export default function ComposeForm() {
           />
         </div>
       </div>
+      {showConfirmationModal && (
+        <ConfirmationModal
+          email={composeForm}
+          onConfirm={confirmAndSendEmail}
+          onCancel={() => setShowConfirmationModal(false)}
+        />
+      )}
     </div>
   );
 }

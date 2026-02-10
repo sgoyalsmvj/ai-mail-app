@@ -1,17 +1,24 @@
 "use client";
 
 import { useMailStore } from "@/store/mailStore";
-import { ArrowLeft, Mail, Calendar, User } from "lucide-react";
+import { ArrowLeft, Mail, Calendar, User, Reply, Forward } from "lucide-react";
 import { useMemo } from "react";
 import DOMPurify from "dompurify";
 
 export default function EmailDetail() {
-  const { currentEmail, setCurrentView, isLoading } = useMailStore();
+  const { currentEmail, setCurrentView, isLoading, executeAction } =
+    useMailStore();
 
   const handleBack = () => {
     setCurrentView("inbox");
   };
 
+  const handleReply = () => {
+    executeAction({ type: "REPLY_TO_CURRENT" });
+  };
+  const handleForward = () => {
+    executeAction({ type: "FORWARD_CURRENT" });
+  };
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -305,6 +312,24 @@ export default function EmailDetail() {
                 ))}
             </div>
           )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 border-b border-zinc-200 px-6 py-3 dark:border-zinc-800">
+          <button
+            onClick={handleReply}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+          >
+            <Reply className="h-4 w-4" />
+            Reply
+          </button>
+          <button
+            onClick={handleForward}
+            className="flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            <Forward className="h-4 w-4" />
+            Forward
+          </button>
         </div>
 
         {/* Email Body */}
