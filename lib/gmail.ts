@@ -223,4 +223,75 @@ const sendEmail = async (
   }
 };
 
-export { fetchInboxEmails, fetchEmailById, sendEmail };
+const fetchSentEmails = async (accessToken: string): Promise<Email[]> => {
+  try {
+    const listResponse = await fetch(
+      "https://www.googleapis.com/gmail/v1/users/me/messages?labelIds=SENT&maxResults=10",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    if (!listResponse.ok) {
+      const errorData = await listResponse.json().catch(() => ({}));
+      console.error("Gmail API error:", {
+        status: listResponse.status,
+        statusText: listResponse.statusText,
+        error: errorData,
+      });
+      throw new Error(
+        `Failed to fetch sent email list: ${listResponse.status} ${listResponse.statusText} - ${JSON.stringify(errorData)}`,
+      );
+    }
+
+    const listData = await listResponse.json();
+    const messages = listData.messages || [];
+
+    if (messages.length === 0) {
+      return [];
+    }
+
+    const emailPromises = messages.map(async (message: any) => {
+      const detailResponse = await fetch(
+        `https://www.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (!detailResponse.ok) {
+        console.error(`Failed to fetch sent email ${message.id}`);
+        return null;
+      }
+
+      const emailData = await detailResponse.json();
+      const headers = parseHeaders(emailData.payload.headers);
+      const body = extractBody(emailData.payload);
+
+      const email: Email = {
+        id: emailData.id,
+        from: headers.from || "Unknown",
+        to: headers.to || "",
+        subject: headers.subject || "(No Subject)",
+        snippet: emailData.snippet || "",
+        body: body || emailData.snippet || "",
+        date: headers.date || new Date().toISOString(),
+        isRead: true,
+        labels: emailData.labelIds || [],
+      };
+      return email;
+    });
+
+    const emails = await Promise.all(emailPromises);
+    return emails.filter((email): email is Email => email !== null);
+  } catch (error) {
+    console.error("Error fetching sent emails:", error);
+    throw error;
+  }
+};
+
+export { fetchInboxEmails, fetchEmailById, sendEmail, fetchSentEmails };

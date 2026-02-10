@@ -20,6 +20,8 @@ export default function Home() {
     isLoading,
     currentView,
     setCurrentView,
+    sentEmails,
+    setSentEmails,
   } = useMailStore();
   const [error, setError] = useState<string | null>(null);
 
@@ -51,10 +53,38 @@ export default function Home() {
     }
   };
 
+  const fetchSentEmails = async () => {
+    if (!session) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/mail/sent");
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Session expired. Please sign in again.");
+        }
+        throw new Error("Failed to fetch sent emails");
+      }
+
+      const data = await response.json();
+      setSentEmails(data.emails || []);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch sent emails";
+      setError(errorMessage);
+      console.error("Error fetching sent emails:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // Fetch emails on mount when user is authenticated
   useEffect(() => {
     if (session && status === "authenticated") {
       fetchEmails();
+      fetchSentEmails();
     }
   }, [session, status]);
 
@@ -127,6 +157,66 @@ export default function Home() {
               </div>
 
               <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentView("inbox")}
+                    className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      currentView === "inbox"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                        : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    }`}
+                  >
+                    <Inbox className="h-4 w-4" />
+                    <span>Inbox</span>
+                    {emails.length > 0 && (
+                      <span className="ml-1 rounded-full bg-zinc-200 dark:bg-zinc-700 px-2 py-0.5 text-xs">
+                        {emails.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setCurrentView("sent");
+                      fetchSentEmails();
+                    }}
+                    className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      currentView === "sent"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                        : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    }`}
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                      />
+                    </svg>
+                    <span>Sent</span>
+                    {sentEmails.length > 0 && (
+                      <span className="ml-1 rounded-full bg-zinc-200 dark:bg-zinc-700 px-2 py-0.5 text-xs">
+                        {sentEmails.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setCurrentView("compose")}
+                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                  >
+                    <PenSquare className="h-4 w-4" />
+                    <span>Compose</span>
+                  </button>
+                </div>
+
+                <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
                 <button
                   onClick={fetchEmails}
                   disabled={isLoading}
@@ -187,8 +277,17 @@ export default function Home() {
                 <EmailList />
               </div>
             )}
-            {currentView === "detail" && <EmailDetail />}
 
+            {currentView === "sent" && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+                  Sent Emails
+                </h2>
+                <EmailList emails={sentEmails} />
+              </div>
+            )}
+
+            {currentView === "detail" && <EmailDetail />}
             {currentView === "compose" && <ComposeForm />}
           </div>
         </main>

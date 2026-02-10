@@ -11,6 +11,7 @@ import { toast } from "sonner";
 interface MailStoreState {
   // State
   emails: Email[];
+  sentEmails: Email[];
   filteredEmails: Email[];
   currentView: View;
   currentEmail: Email | null;
@@ -23,6 +24,7 @@ interface MailStoreState {
 
   // Actions
   setEmails: (emails: Email[]) => void;
+  setSentEmails: (emails: Email[]) => void;
   setCurrentView: (view: View) => void;
   setCurrentEmail: (email: Email | null) => void;
   updateComposeForm: (field: keyof ComposeForm, value: string) => void;
@@ -52,6 +54,7 @@ const initialComposeForm: ComposeForm = {
 export const useMailStore = create<MailStoreState>((set, get) => ({
   // Initial state
   emails: [],
+  sentEmails: [],
   filteredEmails: [],
   currentView: "inbox",
   currentEmail: null,
@@ -66,6 +69,8 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
     set({ searchQuery: query });
     get().applyFilters();
   },
+
+  setSentEmails: (emails: Email[]) => set({ sentEmails: emails }),
   setEmails: (emails: Email[]) => {
     set({ emails, filteredEmails: emails });
     get().applyFilters(); // Apply any existing filters
@@ -350,6 +355,10 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
       case "NAVIGATE":
         toast.info(`Navigating to ${action.view}...`);
         set({ currentView: action.view });
+
+        if (action.view !== "inbox") {
+          get().clearFilters();
+        }
         break;
 
       case "REPLY_TO_CURRENT":

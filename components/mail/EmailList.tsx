@@ -2,17 +2,25 @@
 
 import { useMailStore } from "@/store/mailStore";
 import { Mail, MailOpen } from "lucide-react";
+import { Email } from "@/lib/types";
 
 interface EmailListProps {
   onEmailClick?: (emailId: string) => void;
+  emails?: Email[];
 }
 
-export default function EmailList({ onEmailClick }: EmailListProps) {
+export default function EmailList({
+  onEmailClick,
+  emails: emailsProp,
+}: EmailListProps) {
   const { filteredEmails, isLoading, setCurrentEmail, setCurrentView } =
     useMailStore();
 
+  // Use provided emails or fall back to filteredEmails from store
+  const emails = emailsProp || filteredEmails;
+
   const handleEmailClick = (emailId: string) => {
-    const email = filteredEmails.find((e) => e.id === emailId);
+    const email = emails.find((e) => e.id === emailId);
     if (email) {
       setCurrentEmail(email);
       setCurrentView("detail");
@@ -83,7 +91,7 @@ export default function EmailList({ onEmailClick }: EmailListProps) {
   }
 
   // Empty state
-  if (filteredEmails.length === 0) {
+  if (emails.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-12 text-center dark:border-zinc-700 dark:bg-zinc-900">
         <Mail className="mb-4 h-12 w-12 text-zinc-400 dark:text-zinc-600" />
@@ -99,7 +107,7 @@ export default function EmailList({ onEmailClick }: EmailListProps) {
 
   return (
     <div className="space-y-2">
-      {filteredEmails.map((email) => (
+      {emails.map((email) => (
         <div
           key={email.id}
           onClick={() => handleEmailClick(email.id)}

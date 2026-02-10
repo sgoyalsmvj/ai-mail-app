@@ -119,6 +119,27 @@ Response: {
   ]
 }
 
+User: "Show sent emails"
+Response: {
+  "actions": [
+    { "type": "NAVIGATE", "view": "sent" }
+  ]
+}
+
+User: "Go to sent folder"
+Response: {
+  "actions": [
+    { "type": "NAVIGATE", "view": "sent" }
+  ]
+}
+
+User: "Navigate to inbox"
+Response: {
+  "actions": [
+    { "type": "NAVIGATE", "view": "inbox" }
+  ]
+}
+
 User: "Open the latest email"
 Response: {
   "actions": [
