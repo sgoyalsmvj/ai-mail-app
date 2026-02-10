@@ -12,11 +12,7 @@ export async function GET() {
   try {
     // Get the session to retrieve the access token
     const session = await getServerSession(authOptions);
-    console.log("Session check:", {
-      hasSession: !!session,
-      hasAccessToken: !!session?.accessToken,
-      email: session?.user?.email,
-    });
+
     if (!session || !session.accessToken) {
       return NextResponse.json(
         { error: "Unauthorized - No valid session or access token" },

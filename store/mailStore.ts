@@ -127,6 +127,10 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
     get().applyFilters();
   },
 
+  /**
+   * Apply current filters and search query to emails
+   * Filters are applied sequentially: search → sender → date → unread
+   */
   applyFilters: () => {
     const { emails, filters, searchQuery } = get();
 
@@ -202,7 +206,11 @@ export const useMailStore = create<MailStoreState>((set, get) => ({
 
   setIsLoading: (isLoading) => set({ isLoading }),
 
-  // AI Assistant Action Dispatcher
+  /**
+   * AI Assistant Action Dispatcher
+   * Executes actions returned by the OpenAI assistant
+   * Includes validation, error handling, and user feedback via toasts
+   */
   executeAction: async (action) => {
     let state = useMailStore.getState();
 

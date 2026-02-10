@@ -53,10 +53,6 @@ export async function retryWithBackoff<T>(
         config.maxDelay,
       );
 
-      console.log(
-        `Retry attempt ${attempt + 1}/${config.maxRetries} after ${currentDelay}ms`,
-      );
-
       // Wait before retrying
       await new Promise((resolve) => setTimeout(resolve, currentDelay));
     }

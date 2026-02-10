@@ -14,12 +14,6 @@ export async function POST(request: Request) {
     // Get session with auth options
     const session = await getServerSession(authOptions);
 
-    console.log("Send email - Session check:", {
-      hasSession: !!session,
-      hasAccessToken: !!(session as any)?.accessToken,
-      email: session?.user?.email,
-    });
-
     if (!session || !session.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -49,7 +43,6 @@ export async function POST(request: Request) {
     }
 
     // Send email using Gmail API
-    console.log(`Sending email to ${to} with subject: ${subject}`);
     await sendEmail(accessToken, to.trim(), subject.trim(), emailBody.trim());
 
     return NextResponse.json(

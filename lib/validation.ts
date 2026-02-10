@@ -1,5 +1,6 @@
 /**
  * Form validation utilities
+ * Provides comprehensive validation for email composition with detailed error messages
  */
 
 export interface ValidationResult {

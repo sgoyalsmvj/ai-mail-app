@@ -30,12 +30,6 @@ export async function POST(request: Request) {
       currentEmail: context.currentEmail,
     };
 
-    console.log("Processing assistant command:", {
-      message,
-      view: appContext.currentView,
-      hasEmail: !!appContext.currentEmail,
-    });
-
     // Call processCommand
     const result = await processCommand(message, appContext);
 
