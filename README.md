@@ -2,9 +2,6 @@
 
 An intelligent email client that combines Gmail's power with AI-driven natural language control. Simply tell the assistant what you want to do, and watch it handle your emails—from composing and sending to filtering and organizing.
 
-![Project Status](https://img.shields.io/badge/status-production--ready-green)
-![TypeScript](https://img.shields.io/badge/TypeScript-0_errors-blue)
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
 
 ## 🎥 Video Demo
 
